@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "alertmanager-jira.fullname" . }}
+  labels:
+    {{- include "alertmanager-jira.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "alertmanager-jira.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "alertmanager-jira.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: jiralert
+        image: quay.io/app-sre/jiralert:latest
+        imagePullPolicy: Always
+        args:
+        - "--config=/jiralert-config/jiralert.yml"
+        - "--log.level=debug"
+        - "--listen-address=:9097"
+        resources:
+          limits:
+            cpu: 250m
+            memory: 250Mi
+          requests:
+            cpu: 250m
+            memory: 250Mi
+        readinessProbe:
+          tcpSocket:
+            port: 9097
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+        livenessProbe:
+          tcpSocket:
+            port: 9097
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+        ports:
+        - containerPort: 9091
+          name: metrics
+        volumeMounts:
+        - mountPath: /jiralert-config
+          name: jiralert-config
+          readOnly: true
+      volumes:
+      - name: jiralert-config
+        secret:
+          secretName: {{ include "alertmanager-jira.configname" . }} 
